@@ -41,7 +41,6 @@ The default schema covers standard AEM and Dublin Core properties and accepts an
 
 Schemas are managed through the Metadata Schema API at base path `/adobe/metadataSchemas` — `GET`/`HEAD` to list, retrieve, or check a schema (including the default schema at `/default`), `POST` to create or `POST /validate` to check a schema without persisting it, `PUT` to update, and `DELETE` to remove a custom schema.
 
-<!-- TODO: link to the published Metadata Schema API OpenAPI reference once available -->
 For the full request and response contracts, required headers, and status codes for each operation, see the Metadata Schema API reference.
 
 ## Schema document anatomy
