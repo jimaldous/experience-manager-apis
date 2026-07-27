@@ -9,3 +9,4 @@
     - [Introduction](/guides/index.md)
         - [OpenAPI guide](/guides/how-to/index.md)
         - [Events](/guides/events/index.md)
+        - [Metadata Schema](/guides/metadata-schema/index.md)
