@@ -1,6 +1,6 @@
 ---
 title: Guides - AEM
-description: This is the guides overview page of AEM 
+description: This is the guides overview page of AEM
 ---
 
 ## Introduction
@@ -45,3 +45,9 @@ You will develop a sample ReactJS application representing an SPA that interacts
 ### Tutorial: Using OpenAPI-based APIs and Events
 
 Take a look at [AEM Assets events for PIM integration](https://experienceleague.adobe.com/en/docs/experience-manager-learn/cloud-service/aem-eventing/examples/assets-pim-integration) to learn the steps that are needed to onboard the OpenAPI-based APIs and IO Events for the use case of importing metadata from a third-party system whenever a new asset is uploaded into the DAM. This is a great walkthrough for this use case, but also as an example of how to get started with these new development patterns.
+
+### Metadata Schemas developer guide
+
+Metadata schemas specify the metadata properties that matter to your organization, establishing their names, types, constraints, and other details. This guide supplements the Metadata Schema API documentation, covering how to structure a schema, how to use the available keywords, and how a schema shapes what you read and write through the Metadata API for assets and other entities.
+
+[Learn more](metadata-schema/index.md)
