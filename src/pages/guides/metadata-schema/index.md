@@ -14,7 +14,7 @@ Metadata schemas define metadata for file assets, folders, collections and smart
 
 This guide also covers how a schema shapes what you can read and change through each entity type's metadata API, and the properties that exist independent of any schema. It supplements — rather than replaces — each entity type's own OpenAPI reference, which remains the source of truth for exact request/response contracts and status codes.
 
-The underlying metadata API is experimental. Details in this guide are subject to change.
+The underlying Metadata Schema API is experimental. Details in this guide are subject to change.
 
 Properties in a metadata response are either fixed (`repositoryMetadata`, described in the [Repository metadata](#repository-metadata) appendix) or schema-controlled — determined by the schema described throughout this guide. See [Reading and writing metadata](#reading-and-writing-metadata) for the full response shape and how to read and update it.
 
@@ -32,7 +32,7 @@ The default schema covers standard AEM and Dublin Core properties and accepts an
 
 - **Your property definitions**: fields particular to your content lifecycle, project management, or rights management workflows
 - **Controlled vocabularies**: restrict a field to a defined enumeration of allowed values, or link it to an AEM tag tree
-- **Dependent dropdowns**: make the allowed values for one field depend on the value of another
+- **Dependent value sets**: make the allowed values for one field depend on the value of another
 - **Consistent typing**: guarantee a property is always a specific type across all assets, rather than inferring the type from the value written in each PATCH request
 - **Strict property control**: expose only explicitly declared properties; prevent unknown fields from appearing in API responses
 - **Tooling integration**: drive AI-assisted metadata validation and editing, metadata import/export, metadata form generation, and future search index configuration from a well-typed schema definition
@@ -95,7 +95,7 @@ Properties are nested inside named groups. The built-in group names are:
 | `folderMetadata` | Folders and directories |
 | `collectionMetadata` | Collections and smart collections |
 
-You can define additional custom groups for organizational purposes. The group name appears as a top-level key in the metadata response alongside `repositoryMetadata`.
+The group name appears as a top-level key in the metadata response alongside `repositoryMetadata`.
 
 > **Note**: The group name is a schema-level label only. A property declared under `assetMetadata` and the same property declared under a custom group name are both read from and written to the same storage location. Grouping affects the API surface but not storage.
 
@@ -115,7 +115,7 @@ Only the fields and `x-*` keywords documented in this guide are read by the syst
 
 ### Property types and storage
 
-AEM's asset repository is built on JCR (Java Content Repository), which has its own, more limited set of storage types. The table below is provided as reference for readers who need to understand how a property's representation in the API relates to how it's actually stored — most schema authors won't need it.
+The AEM Assets author repository is built on JCR (Java Content Repository), which has its own, more limited set of storage types. The table below is provided as reference for readers who need to understand how a property's representation in the API relates to how it's actually stored — most schema authors won't need it.
 
 | JSON Schema type | Format | JCR storage type | Notes |
 |-----------------|--------|-------------------|-------|
@@ -358,77 +358,6 @@ Available functions:
 | `getAssetETag` | ETag for caching |
 | `getTagInfo` | Enriched AEM tag objects (title, description, path) |
 
-### Value sets
-
-`x-valueSet` declares a fixed set of valid values with optional multilingual labels:
-
-```json
-"myorg:visibility": {
-  "title": "Visibility",
-  "type": "string",
-  "x-valueSet": [
-    { "value": "public",       "label": { "default": "Public",       "fr-FR": "Public" } },
-    { "value": "internal",     "label": { "default": "Internal",     "fr-FR": "Interne" } },
-    { "value": "confidential", "label": { "default": "Confidential", "fr-FR": "Confidentiel" } }
-  ]
-}
-```
-
-Each label object requires a `default` key and accepts any number of BCP 47 locale codes. Client-side resolution: try exact locale match → language-only match → `default`.
-
-For value sets shared across properties, extract the array to a standalone JSON file and reference it:
-
-```json
-"myorg:status": {
-  "type": "string",
-  "x-valueSet": { "$ref": "workflow-statuses.json" }
-}
-```
-
-The standalone file contains only the array — no `$id`, `$schema`, or `$defs` wrapper.
-
-### Vocabulary (AEM tags)
-
-`x-vocabulary` validates values against an AEM tag tree. Tags matching the specified root are the accepted values. The labels and value list are resolved at runtime from the AEM tags themselves:
-
-```json
-"myorg:productCategory": {
-  "title": "Product Category",
-  "type": "string",
-  "x-vocabulary": { "root": "mytags:products/categories" }
-}
-```
-
-`root` is the AEM tag namespace and path, or the UUID of the tag. Set `root` to an empty string to accept all tags. When both `x-vocabulary` and `x-valueSet` are present on the same property, `x-vocabulary` takes precedence.
-
-### Dependent dropdowns
-
-`x-condition` makes the allowed values for a property depend on another property's value:
-
-```json
-"myorg:country": {
-  "title": "Country",
-  "type": "string",
-  "x-valueSet": [
-    { "value": "USA", "label": { "default": "United States" } },
-    { "value": "CAN", "label": { "default": "Canada" } }
-  ]
-},
-"myorg:region": {
-  "title": "State / Province",
-  "type": "string",
-  "x-condition": {
-    "controlProperty": "assetMetadata/myorg:country",
-    "cases": {
-      "USA": { "$ref": "myorg-enums.defs.json#/$defs/us-states" },
-      "CAN": { "$ref": "myorg-enums.defs.json#/$defs/ca-provinces" }
-    }
-  }
-}
-```
-
-`controlProperty` is the full API-level path from the response root. The client reads the control value, selects the matching case, and applies that value set for validation and display. Each case `$ref` points to a standalone value set file (same format as standalone `x-valueSet`).
-
 ### Implicit properties
 
 `x-implicitProperties` enables automatic discovery and inclusion of stored properties not explicitly declared in the schema:
@@ -471,22 +400,6 @@ To merge instead of replacing, add a `$ref` inside your `x-implicitProperties` b
 Setting `enabled: false` always disables implicit discovery immediately, regardless of any `$ref` — disabling short-circuits the merge rather than combining with it.
 
 > **Trade-off**: Implicit discovery is convenient when assets carry properties from varied sources (asset processing, third-party tools, manual editing). The drawback is that the type of an implicitly discovered property on write is inferred from the JSON value in the PATCH body, not from a declaration — which can result in inconsistent stored property types across different assets.
-
-### UI hints
-
-`x-ui` provides rendering hints for metadata editing interfaces. These are stored in the schema and returned to clients but are not enforced by the API:
-
-```json
-"myorg:description": {
-  "type": "string",
-  "x-ui": {
-    "widget": "textarea",
-    "hidden": false
-  }
-}
-```
-
-When a schema and a definition file both declare `x-ui` for the same property, individual keys are merged — a key set in the schema overrides the same key from the definition, but keys present only in the definition are preserved.
 
 ### Object array extensions
 
@@ -556,6 +469,96 @@ By default, each item property name is also the name used in storage. Use `x-sto
 On read, the stored property `name` on each entry is returned as the API field `value`. On write, a value supplied as `value` in the PATCH body is written to the stored property `name`.
 
 `x-storedAs` applies only to properties inside an object array's `items.properties`, or the `properties` of an object-typed property. It has no effect on top-level or scalar properties.
+
+## Pass-through keywords
+
+he keywords in this section are stored and returned by the API verbatim — the Metadata Schema API and the Metadata API do not interpret or act on them. They exist for API clients, such as a metadata form builder or a metadata validator, to read and use.
+
+### Value sets
+
+`x-valueSet` declares a fixed set of valid values with optional multilingual labels:
+
+```json
+"myorg:visibility": {
+  "title": "Visibility",
+  "type": "string",
+  "x-valueSet": [
+    { "value": "public",       "label": { "default": "Public",       "fr-FR": "Public" } },
+    { "value": "internal",     "label": { "default": "Internal",     "fr-FR": "Interne" } },
+    { "value": "confidential", "label": { "default": "Confidential", "fr-FR": "Confidentiel" } }
+  ]
+}
+```
+
+Each label object requires a `default` key and accepts any number of BCP 47 locale codes. Client-side resolution: try exact locale match → language-only match → `default`.
+
+For value sets shared across properties, extract the array to a standalone JSON file and reference it:
+
+```json
+"myorg:status": {
+  "type": "string",
+  "x-valueSet": { "$ref": "workflow-statuses.json" }
+}
+```
+
+The standalone file contains only the array — no `$id`, `$schema`, or `$defs` wrapper.
+
+### Dependent value sets
+
+`x-condition` makes the allowed values for a property depend on another property's value:
+
+```json
+"myorg:country": {
+  "title": "Country",
+  "type": "string",
+  "x-valueSet": [
+    { "value": "USA", "label": { "default": "United States" } },
+    { "value": "CAN", "label": { "default": "Canada" } }
+  ]
+},
+"myorg:region": {
+  "title": "State / Province",
+  "type": "string",
+  "x-condition": {
+    "controlProperty": "assetMetadata/myorg:country",
+    "cases": {
+      "USA": { "$ref": "myorg-enums.defs.json#/$defs/us-states" },
+      "CAN": { "$ref": "myorg-enums.defs.json#/$defs/ca-provinces" }
+    }
+  }
+}
+```
+
+`controlProperty` is the full API-level path from the response root. The client reads the control value, selects the matching case, and applies that value set for validation and display. Each case `$ref` points to a standalone value set file (same format as standalone `x-valueSet`).
+### Vocabulary (AEM tags)
+
+`x-vocabulary` designates a property's valid values as the tags contained within an AEM tag hierarchy, rather than an explicit list:
+
+```json
+"myorg:productCategory": {
+  "title": "Product Category",
+  "type": "string",
+  "x-vocabulary": { "root": "<tag-id>" }
+}
+```
+
+`root` specifies the identifier of the root of the tag hierarchy of valid values for the property. Labels and the resolved value list come from the AEM tags themselves, at whatever time the consuming process resolves them.
+
+### UI hints
+
+`x-ui` provides rendering hints for metadata editing interfaces:
+
+```json
+"myorg:description": {
+  "type": "string",
+  "x-ui": {
+    "widget": "textarea",
+    "hidden": false
+  }
+}
+```
+
+When a schema and a definition file both declare `x-ui` for the same property, individual keys are merged — a key set in the schema overrides the same key from the definition, but keys present only in the definition are preserved.
 
 ## Reading and writing metadata
 
