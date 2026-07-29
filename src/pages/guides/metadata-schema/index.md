@@ -1,5 +1,5 @@
 ---
-title: Metadata Schemas developer guide
+title: Metadata Schema developer guide
 description: How to structure a metadata schema and use it with the Metadata API
 ---
 
@@ -472,7 +472,7 @@ On read, the stored property `name` on each entry is returned as the API field `
 
 ## Pass-through keywords
 
-he keywords in this section are stored and returned by the API verbatim — the Metadata Schema API and the Metadata API do not interpret or act on them. They exist for API clients, such as a metadata form builder or a metadata validator, to read and use.
+The keywords in this section are stored and returned by the API verbatim — the Metadata Schema API and the Metadata API do not interpret or act on them. They exist for API clients, such as a metadata form builder or a metadata validator, to read and use.
 
 ### Value sets
 
@@ -747,91 +747,97 @@ GET /adobe/assets/{assetId}/metadata?schemaId=acme-corp.schema.json
 → 200 OK
 ```
 
-## Repository metadata
+## Repository metadata (AEM Author implementation)
 
 `repositoryMetadata` properties are computed and maintained by AEM — always read-only, always present, unaffected by which schema is in effect. Attempting to modify one through PATCH fails the entire request. No changes are applied.
 
-Each table below describes a category of repository metadata. For this implementation, most of this metadata is populated using JCR source information, either directly or indirectly — a few properties, noted individually, come from outside JCR entirely. This information is included in the **JCR source** column for reference. Future implementations may use different sources.
+The repositoryMetadata properties are documented in the Metadata API documentation. The tables below are provided as a reference to identify the source used for these values of these properties in the AEM author implementation. Most of this metadata is populated using JCR source information, either directly or indirectly. A few properties, noted individually, come from outside JCR entirely. Other implementations may use different sources.
 
 ### Node identity and structure
 
-| Property | JCR source | Notes |
-|----------|------------|-------|
-| `repo:name` | The entity node's own name | Not a stored property. The entity's name — the filename or folder name. |
-| `repo:path` | The entity node's own path | Not a stored property. The full absolute path to the entity (e.g. `/content/dam/marketing/photo.jpg`). |
-| `repo:assetId` | Derived from the entity node's JCR UUID | Formatted as a URN: `urn:aaid:aem:{uuid}`. This is the canonical identifier for use in API requests. |
-| `repo:assetClass` | Computed from node type, `sling:resourceType`, and a `contentFragment` flag under `jcr:content` | Entity type: `file`, `directory`, `collection`, or `contentFragment`. Resolves to `unknown` for anything outside `/content` or `/content/dam`. |
-| `repo:parent` | Derived from the parent node's UUID | ID (URN) of the direct parent folder. Omitted if there is no accessible parent. |
-| `repo:ancestors` | Walks parent nodes upward to `/content/dam` or `/content` | Array of IDs (URNs) for all ancestor folders up to `/content/dam` or `/content`. The last item is the ID of the direct parent. |
+| Property | JCR source |
+|----------|------------|
+| `repo:name` | The entity node's own name |
+| `repo:path` | The entity node's own path |
+| `repo:assetId` | Derived from the entity node's JCR UUID |
+| `repo:assetClass` | Computed from node type, `sling:resourceType`, and a `contentFragment` flag under `jcr:content` |
+| `repo:parent` | Derived from the parent node's UUID |
+| `repo:ancestors` | Walks parent nodes upward to `/content/dam` or `/content` |
 
 ### Timestamps and authorship
 
-| Property | JCR source | Notes |
-|----------|------------|-------|
-| `repo:createDate` | `jcr:created` on the entity node | ISO 8601 timestamp when the entity was created. |
-| `repo:createdBy` | `jcr:createdBy` on the entity node | User ID of the creator. |
-| `repo:modifyDate` | Collections: `jcr:lastModified` on the entity node itself. All other entity types: `jcr:content/jcr:lastModified` | ISO 8601 timestamp of the most recent modification. |
-| `repo:modifiedBy` | Collections: `jcr:lastModifiedBy` on the entity node. All other entity types: `jcr:content/jcr:lastModifiedBy` | User ID of the last modifier. |
+| Property | JCR source |
+|----------|------------|
+| `repo:createDate` | `jcr:created` on the entity node |
+| `repo:createdBy` | `jcr:createdBy` on the entity node |
+| `repo:modifyDate` | Collections: `jcr:lastModified` on the entity node itself. All other entity types: `jcr:content/jcr:lastModified` |
+| `repo:modifiedBy` | Collections: `jcr:lastModifiedBy` on the entity node. All other entity types: `jcr:content/jcr:lastModifiedBy` |
 
 ### Format, size, and content
 
-| Property | JCR source | Notes |
-|----------|------------|-------|
-| `dc:format` | Files: `jcr:content/metadata/dc:format`. Content fragments and folders/collections: not read from storage | MIME type. For files: stored MIME type (e.g. `image/jpeg`). For content fragments: always `application/vnd.adobe.contentfragment`. For folders and collections: a fixed value derived from entity type. |
-| `repo:size` | `jcr:content/metadata/dam:size` | Binary size in bytes. |
-| `dam:sha1` | `jcr:content/metadata/dam:sha1` | SHA-1 hash of the original binary. |
-| `tiff:imageWidth` | `jcr:content/metadata/tiff:ImageWidth` | Width in pixels. Omitted if not set (non-image assets). |
-| `tiff:imageLength` | `jcr:content/metadata/tiff:ImageLength` | Height in pixels. Omitted if not set. |
+| Property | JCR source |
+|----------|------------|
+| `dc:format` | Files: `jcr:content/metadata/dc:format`. Content fragments and folders/collections: not read from storage |
+| `repo:size` | `jcr:content/metadata/dam:size` |
+| `dam:sha1` | `jcr:content/metadata/dam:sha1` |
+| `tiff:imageWidth` | `jcr:content/metadata/tiff:ImageWidth` |
+| `tiff:imageLength` | `jcr:content/metadata/tiff:ImageLength` |
 
 ### Publish state and lifecycle
 
-| Property | JCR source | Notes |
-|----------|------------|-------|
-| `isPublishedToAemPublish` | Computed from `jcr:content/cq:lastReplicationAction` | `true` when the asset has been activated to AEM Publish (the underlying value is `Activate`); `false` otherwise (not omitted). |
-| `isPublishedToDynamicMedia` | Computed from `jcr:content/metadata/dam:scene7FileStatus` | `true` when the asset's Scene7 publish status is `PublishComplete`; `false` otherwise. |
-| `aem:published` | `jcr:content/cq:lastReplicated` | ISO 8601 timestamp of the most recent publish to AEM Publish. |
-| `lastPublishedToAemPublish` | `jcr:content/cq:lastReplicated` | ISO 8601 timestamp of the most recent publish to AEM Publish. Same underlying property as `aem:published` — the two are always equal. |
-| `lastPublishedToDynamicMedia` | `jcr:content/metadata/dam:scene7PublishTimeStamp` | ISO 8601 timestamp of the most recent publish to Dynamic Media. |
-| `aem:assetState` | `jcr:content/dam:assetState` | Processing pipeline state: `Processing` or `Processed`. |
-| `aem:checkedOutBy` | `jcr:content/cq:drivelock` | User ID of the user who has checked out the asset. Omitted if the asset is not checked out. |
-| `repo:state` | Computed: reads `jcr:content/cq:discardState` on the entity; if absent, walks parent folders for a `DISCARDED` state | Discard lifecycle state. Omitted entirely when the value is `ACTIVE` (the default). When a parent folder is in a `DISCARDED` state, this returns `DISCARDED_PARENT`. |
+| Property | JCR source |
+|----------|------------|
+| `isPublishedToAemPublish` | Computed from `jcr:content/cq:lastReplicationAction` |
+| `isPublishedToDynamicMedia` | Computed from `jcr:content/metadata/dam:scene7FileStatus` |
+| `aem:published` | `jcr:content/cq:lastReplicated` |
+| `lastPublishedToAemPublish` | `jcr:content/cq:lastReplicated` |
+| `lastPublishedToDynamicMedia` | `jcr:content/metadata/dam:scene7PublishTimeStamp` |
+| `aem:assetState` | `jcr:content/dam:assetState` |
+| `aem:checkedOutBy` | `jcr:content/cq:drivelock` |
+| `repo:state` | Computed: reads `jcr:content/cq:discardState` on the entity; if absent, walks parent folders for a `DISCARDED` state |
 
 ### Repository identity and caching
 
-| Property | JCR source | Notes |
-|----------|------------|-------|
-| `repo:repositoryId` | Not derived from storage — read from environment/deployment configuration | A stable identifier for the AEM repository instance (e.g. `author-p12345-e123456.adobeaemcloud.com`). Omitted if not configured. |
-| `repo:etag` | Not a stored property | Computed as a hash over the schema ID, entity path, and the full serialized metadata response. Changes whenever any of those change. Use with `If-None-Match` (GET) or `If-Match` (PATCH). |
+| Property | JCR source |
+|----------|------------|
+| `repo:repositoryId` | Not derived from storage — read from environment/deployment configuration |
+| `repo:etag` | Not a stored property — computed from other values |
 
 ### Dynamic Media (Scene7)
 
 Present only for assets synchronized with Dynamic Media; omitted when not set. All map 1:1 to a property under `jcr:content/metadata/`.
 
-| Property | JCR source | Source |
-|----------|------------|--------|
-| `repo:scene7Domain` | `jcr:content/metadata/dam:scene7Domain` | Scene7 delivery domain |
-| `repo:scene7File` | `jcr:content/metadata/dam:scene7File` | Scene7 file path |
-| `repo:scene7FileStatus` | `jcr:content/metadata/dam:scene7FileStatus` | Scene7 synchronization status (e.g. `PublishComplete`) |
-| `repo:scene7Folder` | `jcr:content/metadata/dam:scene7Folder` | Scene7 folder path |
-| `repo:scene7FontStyle` | `jcr:content/metadata/dam:scene7FontStyle` | Font style (font assets) |
-| `repo:scene7FontType` | `jcr:content/metadata/dam:scene7FontType` | Font type (font assets) |
-| `repo:scene7LastModified` | `jcr:content/metadata/dam:scene7LastModified` | Timestamp of last Scene7 modification |
-| `repo:scene7Name` | `jcr:content/metadata/dam:scene7Name` | Scene7 asset name |
-| `repo:scene7RTFName` | `jcr:content/metadata/dam:scene7RTFName` | RTF font name (font assets) |
-| `repo:scene7Type` | `jcr:content/metadata/dam:scene7Type` | Scene7 asset type |
+| Property | JCR source |
+|----------|------------|
+| `repo:scene7Domain` | `jcr:content/metadata/dam:scene7Domain` |
+| `repo:scene7File` | `jcr:content/metadata/dam:scene7File` |
+| `repo:scene7FileStatus` | `jcr:content/metadata/dam:scene7FileStatus` |
+| `repo:scene7Folder` | `jcr:content/metadata/dam:scene7Folder` |
+| `repo:scene7FontStyle` | `jcr:content/metadata/dam:scene7FontStyle` |
+| `repo:scene7FontType` | `jcr:content/metadata/dam:scene7FontType` |
+| `repo:scene7LastModified` | `jcr:content/metadata/dam:scene7LastModified` |
+| `repo:scene7Name` | `jcr:content/metadata/dam:scene7Name` |
+| `repo:scene7RTFName` | `jcr:content/metadata/dam:scene7RTFName` |
+| `repo:scene7Type` | `jcr:content/metadata/dam:scene7Type` |
 
 ### Malware scanning
 
 Present only when the asset has been scanned; omitted when not set. All map 1:1 to a property directly under `jcr:content` — note this is *not* under the `metadata` child node, unlike the Dynamic Media properties above.
 
-| Property | JCR source | Notes |
-|----------|------------|-------|
-| `dam:avScanStatus` | `jcr:content/dam:avScanStatus` | Scan outcome (e.g. `clean`, `infected`) |
-| `dam:avInfectedReason` | `jcr:content/dam:avInfectedReason` | Reason for an infected status |
-| `dam:avScanner` | `jcr:content/dam:avScanner` | Name of the antivirus scanner |
-| `dam:avScanStartDate` | `jcr:content/dam:avScanStartDate` | ISO 8601 timestamp when the scan began |
-| `dam:avScanEndDate` | `jcr:content/dam:avScanEndDate` | ISO 8601 timestamp when the scan completed |
-| `dam:avScanDuration` | `jcr:content/dam:avScanDuration` | Duration in milliseconds |
-| `dam:avEngineVersion` | `jcr:content/dam:avEngineVersion` | Antivirus engine version string |
-| `dam:avOriginalAssetPath` | `jcr:content/dam:avOriginalAssetPath` | Original path of a quarantined asset |
-| `dam:originalQuarantinedPath` | `jcr:content/dam:originalQuarantinedPath` | Quarantine path |
+| Property | JCR source |
+|----------|------------|
+| `dam:avScanStatus` | `jcr:content/dam:avScanStatus` |
+| `dam:avInfectedReason` | `jcr:content/dam:avInfectedReason` |
+| `dam:avScanner` | `jcr:content/dam:avScanner` |
+| `dam:avScanStartDate` | `jcr:content/dam:avScanStartDate` |
+| `dam:avScanEndDate` | `jcr:content/dam:avScanEndDate` |
+| `dam:avScanDuration` | `jcr:content/dam:avScanDuration` |
+| `dam:avEngineVersion` | `jcr:content/dam:avEngineVersion` |
+| `dam:avOriginalAssetPath` | `jcr:content/dam:avOriginalAssetPath` |
+| `dam:originalQuarantinedPath` | `jcr:content/dam:originalQuarantinedPath` |
+
+## Asset metadata (AEM Author implementation)
+`assetMetadata` properties are generally available for reading and writing by API clients. The following information is provided as a reference for the AEM Author implementation of the Metadata API:
+- In general, unless otherwise configured or implemented, assetMetadata properties for assets are stored on the `jcr:content/metadata` node of assets. Folder metadata is stored on the `jcr:content` node and collection metadata is stored on the root node of the collection.
+- The following properties are exceptions and are stored on the `jcr:content` node of assets:
+  - `onTime`, `offTime`, `dam:rightsManaged`, `dam:metadataForm`
